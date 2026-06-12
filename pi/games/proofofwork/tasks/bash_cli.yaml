@@ -1,0 +1,37 @@
+subject: Bash & Linux Command Line
+description: Solve Bash and Linux command-line questions covering file operations, scripting, and common tools.
+max_time_reduction: 900
+max_time_addition: 600
+
+evaluator_notes: >
+  A command is substantially correct if it would work with a trivial fix.
+  An explanation is substantially correct if it conveys the right meaning even if
+  imprecisely worded. The student must explain the commands in their own words
+  (not just restate the command). Each answer is one vote — one strong or weak
+  answer must not override the overall verdict.
+
+tasks:
+  - title: Command Output Questions
+    generate: >
+      Create a short scenario: a log file called /var/log/app.log exists on a Linux
+      system. Write 4 specific questions that can each be answered with a single
+      command (or a short pipeline of 2–3 commands) using common tools such as cat,
+      grep, tail, head, wc, cut, sort, uniq, or pipes. Make the questions concrete
+      and unambiguous — for example "show only the last 20 lines" or "count how many
+      lines contain the word ERROR". Number them 1–4. Present only the questions,
+      no solutions or hints.
+    generate_count: 4
+
+  - title: Explain the Command
+    questions:
+      - >
+        What does the following command do? Explain each part.
+
+            grep -v "DEBUG" /var/log/app.log | tail -n 50 > recent_errors.txt
+      - >
+        What does the following command do? Explain each part.
+
+            cat /var/log/app.log | cut -d' ' -f1 | sort | uniq -c | sort -rn | head -5
+    player_notes: >
+      Write all your answers in the text box: your command for each of questions
+      1–4, then your explanation for each of the two "Explain the Command" questions.

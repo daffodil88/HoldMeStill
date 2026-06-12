@@ -1,0 +1,29 @@
+subject: Clean Your Room
+description: Tidy your room and submit photo evidence showing the floor, bed, and surfaces.
+max_time_reduction: 1800
+max_time_addition: 600
+verify_novelty: files_only
+
+criteria:
+  - "Floor clear — all clothes, bags, and rubbish removed from the floor"
+  - "Bed made — bed is made or bedding is straightened"
+  - "Surfaces clear — visible desk or surface clutter removed or organised"
+
+requirements:
+  - "At least 3 photos must be submitted"
+  - "Photos must clearly show the same room (no downloaded or staged images)"
+
+evaluator_notes: >
+  Items shoved out of frame or hidden count as not done.
+  One tidy corner must not override a visibly messy floor.
+  A few wrinkles on the bedding are still a pass.
+
+tasks:
+  - title: Tidy Up Your Room
+    questions:
+      - Clear all items off the floor (clothes, bags, rubbish, etc.)
+      - Make your bed or straighten bedding
+      - Clear or organise any visible desk or surface clutter
+    player_notes: >
+      Take 3–5 photos from different angles showing the result, then upload them
+      as your proof of work.

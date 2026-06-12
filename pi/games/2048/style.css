@@ -1,0 +1,164 @@
+/* ── 2048: layout ─────────────────────────────────────────────────────────── */
+.t2048-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 400px;
+}
+
+/* ── Header: title + score ───────────────────────────────────────────────── */
+.t2048-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.t2048-target-label {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #bbada0;
+    letter-spacing: 0.04em;
+    min-width: 0;
+}
+
+.t2048-score-box {
+    background: #bbada0;
+    border-radius: 4px;
+    padding: 6px 18px;
+    text-align: center;
+    min-width: 80px;
+}
+
+.t2048-score-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #eee4da;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.t2048-score-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Board ───────────────────────────────────────────────────────────────── */
+.t2048-board {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, 80px);
+    grid-template-rows: repeat(4, 80px);
+    gap: 8px;
+    background: #bbada0;
+    border-radius: 6px;
+    padding: 8px;
+    touch-action: none;  /* prevent browser scroll hijack during swipe */
+}
+
+/* Background cells (static grid squares) */
+.t2048-bg-cell {
+    width: 80px;
+    height: 80px;
+    background: #cdc1b4;
+    border-radius: 3px;
+}
+
+/* Tile overlay: absolute grid placed on top of background cells */
+.t2048-tile {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: 700;
+    user-select: none;
+}
+
+/* Position each tile over its grid cell (accounting for 8px padding + 8px gap) */
+.t2048-tile:nth-child(17)  { top:   8px; left:   8px; }
+.t2048-tile:nth-child(18)  { top:   8px; left:  96px; }
+.t2048-tile:nth-child(19)  { top:   8px; left: 184px; }
+.t2048-tile:nth-child(20)  { top:   8px; left: 272px; }
+.t2048-tile:nth-child(21)  { top:  96px; left:   8px; }
+.t2048-tile:nth-child(22)  { top:  96px; left:  96px; }
+.t2048-tile:nth-child(23)  { top:  96px; left: 184px; }
+.t2048-tile:nth-child(24)  { top:  96px; left: 272px; }
+.t2048-tile:nth-child(25)  { top: 184px; left:   8px; }
+.t2048-tile:nth-child(26)  { top: 184px; left:  96px; }
+.t2048-tile:nth-child(27)  { top: 184px; left: 184px; }
+.t2048-tile:nth-child(28)  { top: 184px; left: 272px; }
+.t2048-tile:nth-child(29)  { top: 272px; left:   8px; }
+.t2048-tile:nth-child(30)  { top: 272px; left:  96px; }
+.t2048-tile:nth-child(31)  { top: 272px; left: 184px; }
+.t2048-tile:nth-child(32)  { top: 272px; left: 272px; }
+
+.t2048-empty { background: transparent; }
+
+/* ── Tile colours ────────────────────────────────────────────────────────── */
+.t2048-v2    { background: #eee4da; color: #776e65; }
+.t2048-v4    { background: #ede0c8; color: #776e65; }
+.t2048-v8    { background: #f2b179; color: #f9f6f2; }
+.t2048-v16   { background: #f59563; color: #f9f6f2; }
+.t2048-v32   { background: #f67c5f; color: #f9f6f2; }
+.t2048-v64   { background: #f65e3b; color: #f9f6f2; }
+.t2048-v128  { background: #edcf72; color: #f9f6f2; font-size: 1.5rem; }
+.t2048-v256  { background: #edcc61; color: #f9f6f2; font-size: 1.5rem; }
+.t2048-v512  { background: #edc850; color: #f9f6f2; font-size: 1.5rem; }
+.t2048-v1024 { background: #edc53f; color: #f9f6f2; font-size: 1.2rem; }
+.t2048-v2048 { background: #edc22e; color: #f9f6f2; font-size: 1.2rem; }
+.t2048-vhigh { background: #3c3a32; color: #f9f6f2; font-size: 1rem; }
+
+/* ── Mobile responsive (≤ 520px) ────────────────────────────────────────── */
+@media (max-width: 520px) {
+    .t2048-board {
+        grid-template-columns: repeat(4, 60px);
+        grid-template-rows: repeat(4, 60px);
+        gap: 6px;
+        padding: 6px;
+    }
+
+    .t2048-bg-cell {
+        width: 60px;
+        height: 60px;
+    }
+
+    .t2048-tile {
+        width: 60px;
+        height: 60px;
+        font-size: 1.3rem;
+    }
+
+    /* Reposition tiles for 60px cells + 6px gap + 6px padding */
+    .t2048-tile:nth-child(17)  { top:   6px; left:   6px; }
+    .t2048-tile:nth-child(18)  { top:   6px; left:  72px; }
+    .t2048-tile:nth-child(19)  { top:   6px; left: 138px; }
+    .t2048-tile:nth-child(20)  { top:   6px; left: 204px; }
+    .t2048-tile:nth-child(21)  { top:  72px; left:   6px; }
+    .t2048-tile:nth-child(22)  { top:  72px; left:  72px; }
+    .t2048-tile:nth-child(23)  { top:  72px; left: 138px; }
+    .t2048-tile:nth-child(24)  { top:  72px; left: 204px; }
+    .t2048-tile:nth-child(25)  { top: 138px; left:   6px; }
+    .t2048-tile:nth-child(26)  { top: 138px; left:  72px; }
+    .t2048-tile:nth-child(27)  { top: 138px; left: 138px; }
+    .t2048-tile:nth-child(28)  { top: 138px; left: 204px; }
+    .t2048-tile:nth-child(29)  { top: 204px; left:   6px; }
+    .t2048-tile:nth-child(30)  { top: 204px; left:  72px; }
+    .t2048-tile:nth-child(31)  { top: 204px; left: 138px; }
+    .t2048-tile:nth-child(32)  { top: 204px; left: 204px; }
+
+    .t2048-v128,
+    .t2048-v256,
+    .t2048-v512  { font-size: 1.1rem; }
+
+    .t2048-v1024,
+    .t2048-v2048,
+    .t2048-vhigh { font-size: 0.9rem; }
+}

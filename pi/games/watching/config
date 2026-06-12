@@ -1,0 +1,31 @@
+# Seconds added to the lock timer when a new game attempt is started.
+ATTEMPT_PENALTY_SECONDS=2700
+
+# Seconds subtracted from the lock timer when the game is won.
+WIN_REWARD_SECONDS=900
+
+# Minimum gap between dots, in seconds. After a dot is resolved (clicked or
+# timed out), the next dot will not appear for at least this long.
+MIN_DOT_INTERVAL_SECONDS=10
+
+# Maximum gap between dots, in seconds. The actual interval is chosen randomly
+# between MIN_DOT_INTERVAL_SECONDS and this value.
+MAX_DOT_INTERVAL_SECONDS=40
+
+# Seconds the player has to click a dot before it counts as missed.
+DOT_TIMEOUT_SECONDS=10
+
+# Maximum percentage of dots that may be missed for the game to count as a win.
+# For example, 20 with 10 dots shown allows up to 2 misses (10 * 0.20 = 2).
+# Set to 0 to require every dot to be clicked; 100 means any number of misses
+# is allowed.
+MAX_MISS_PERCENT=15
+
+# Duration of the video segment the player must watch, in seconds.
+# Set to 0 to watch the full video (no slider shown).
+# If this value is longer than the video, the slider is also not shown.
+SEGMENT_DURATION_SECONDS=900
+
+# Optional: absolute path to the directory containing video files.
+# If omitted, defaults to the videos/ subdirectory inside this game directory.
+# Example (USB stick): VIDEO_DIR=/media/usb/videos

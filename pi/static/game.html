@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lock Game</title>
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <link id="game-style" rel="stylesheet" href="">
+    <script>document.getElementById('game-style').href =
+        '/games/' + window.location.pathname.split('/').pop() + '/style.css';</script>
+</head>
+<body>
+    <header class="site-header site-header--game">
+        <div id="timer"></div>
+        <span class="site-title" id="game-title">Game</span>
+        <button class="main-menu-btn" id="main-menu-btn">Main Menu</button>
+    </header>
+
+    <!-- Warning dialog for leaving the game -->
+    <div class="modal-backdrop" id="leave-modal" hidden>
+        <div class="modal">
+            <p class="modal-msg">Leave this game?</p>
+            <div class="modal-btns">
+                <button class="modal-btn" id="leave-new-tab">Open in a new tab</button>
+                <button class="modal-btn modal-btn-danger" id="leave-abandon">Abandon game</button>
+            </div>
+            <button class="modal-cancel" id="leave-cancel">Cancel</button>
+        </div>
+    </div>
+
+    <div id="game-container"></div>
+
+    <!-- Framework must load before plugins -->
+    <script src="/static/framework.js"></script>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const pathParts = window.location.pathname.split('/');
+        const gameId = pathParts[pathParts.length - 1];
+        const instanceId = params.get('instance_id');
+
+        // Set page title from full game name via API
+        fetch('/api/games')
+            .then(r => r.json())
+            .then(games => {
+                const game = games.find(g => g.id === gameId);
+                const title = game ? game.name : gameId.charAt(0).toUpperCase() + gameId.slice(1);
+                document.getElementById('game-title').textContent = title;
+                document.title = title;
+            })
+            .catch(() => {
+                const fallback = gameId.charAt(0).toUpperCase() + gameId.slice(1);
+                document.getElementById('game-title').textContent = fallback;
+                document.title = fallback;
+            });
+
+        // Start timer (game page always shows the timer)
+        GameFramework.startTimer(document.getElementById('timer'));
+
+        // Dynamically load only this game's plugin, then start it
+        const _pluginScript = document.createElement('script');
+        _pluginScript.src = `/games/${gameId}/${gameId}.js`;
+        _pluginScript.onerror = () => {
+            document.getElementById('game-container').textContent =
+                `Failed to load game: ${gameId}`;
+        };
+        _pluginScript.onload = () => {
+            if (instanceId) {
+                GameFramework.startGame(
+                    document.getElementById('game-container'),
+                    gameId,
+                    instanceId
+                );
+            } else {
+                document.getElementById('game-container').textContent =
+                    'No instance ID in URL. Use the game selector to start.';
+            }
+        };
+        document.head.appendChild(_pluginScript);
+
+        // "Main Menu" button — show warning dialog instead of navigating directly
+        document.getElementById('main-menu-btn').addEventListener('click', () => {
+            document.getElementById('leave-modal').hidden = false;
+        });
+
+        document.getElementById('leave-new-tab').addEventListener('click', () => {
+            window.open('/', '_blank');
+            document.getElementById('leave-modal').hidden = true;
+        });
+
+        document.getElementById('leave-abandon').addEventListener('click', () => {
+            window.location.href = '/';
+        });
+
+        document.getElementById('leave-cancel').addEventListener('click', () => {
+            document.getElementById('leave-modal').hidden = true;
+        });
+    </script>
+</body>
+</html>

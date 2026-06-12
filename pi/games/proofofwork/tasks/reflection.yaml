@@ -1,0 +1,27 @@
+subject: Reflection
+description: Reflect on your recent behaviour, habits, or goals and write honest, thoughtful answers.
+max_time_reduction: 900
+max_time_addition: 600
+verify_novelty: true
+
+criteria:
+  - "Authenticity — the writing feels personal and genuine, not generic or interchangeable"
+  - "Depth of thought — goes beyond surface observations to explore nuance, contradiction, or an underlying idea"
+  - "Specific observation — concrete details, scenes, or examples rather than vague abstractions"
+  - "Self-awareness — genuine insight into own feelings, patterns, or perspective"
+  - "Coherence — a thought develops from beginning to end rather than a loose list of disconnected observations"
+
+evaluator_notes: >
+  A submission that is brief but genuinely insightful should score well; a long submission
+  full of platitudes and generalities should score poorly.
+
+tasks:
+  - title: Write your reflection
+    player_notes: >
+      Write a free-form reflection on any topic that feels real and present to you —
+      life, friendship, love, nature, health, ageing, identity, loss, change, or
+      anything else that is on your mind. It can also take the form of a diary entry.
+      There is no required length and no required topic. What matters is that you
+      make a genuine effort: go beyond the obvious, be specific, and let your actual
+      thoughts lead rather than reaching for ready-made phrases. A short piece that
+      says something real is worth more than a long piece that says nothing.

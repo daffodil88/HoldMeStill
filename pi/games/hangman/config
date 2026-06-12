@@ -1,0 +1,8 @@
+# Seconds added to the lock timer when a new game attempt is started.
+ATTEMPT_PENALTY_SECONDS=600
+
+# Seconds subtracted from the lock timer when the game is won.
+WIN_REWARD_SECONDS=600
+
+# Number of wrong letter guesses allowed before the game is lost. (default = 6)
+MAX_WRONG=6

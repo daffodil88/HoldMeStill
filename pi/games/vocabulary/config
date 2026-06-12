@@ -1,0 +1,11 @@
+# Seconds added to the lock timer when a new game attempt is started.
+ATTEMPT_PENALTY_SECONDS=600
+
+# Seconds subtracted from the lock timer when the game is won.
+WIN_REWARD_SECONDS=300
+
+# Maximum allowed mistake rate (as a percentage of total words) for the game to
+# count as a win. For example, 80 with a 10-word file allows up to 2 mistakes
+# (10 * (1 - 0.80) = 2). Set to 0 to allow any number of mistakes; 100 means
+# zero mistakes allowed.
+WIN_ACCURACY_PERCENT=75

@@ -1,0 +1,109 @@
+/* ── Wordle: grid ─────────────────────────────────────────────────────────── */
+.wordle-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.wordle-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 62px);
+    grid-template-rows: repeat(6, 62px);
+    gap: 5px;
+}
+
+.wordle-cell {
+    width: 62px;
+    height: 62px;
+    border: 2px solid #3a3a3c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.wordle-cell.filled   { border-color: #565758; }
+.wordle-cell.correct  { background: #538d4e; border-color: #538d4e; color: #fff; }
+.wordle-cell.present  { background: #b59f3b; border-color: #b59f3b; color: #fff; }
+.wordle-cell.absent   { background: #3a3a3c; border-color: #3a3a3c; color: #fff; }
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-6px); }
+    40%       { transform: translateX(6px); }
+    60%       { transform: translateX(-6px); }
+    80%       { transform: translateX(6px); }
+}
+.wordle-cell.shake { animation: shake 0.45s ease-in-out; }
+
+/* ── Wordle: indicator rows ───────────────────────────────────────────────── */
+.wordle-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    width: 334px;   /* matches 5×62px + 4×5px gap */
+}
+
+.indicator-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    flex-wrap: wrap;
+}
+
+.indicator-label {
+    color: #818384;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.indicator-tile {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.indicator-tile.correct { background: #538d4e; color: #fff; }
+.indicator-tile.present { background: #b59f3b; color: #fff; }
+.indicator-tile.empty   { background: #3a3a3c; color: #565758; }
+
+/* ── Error message ───────────────────────────────────────────────────────── */
+.game-message.error { color: #e05252; }
+
+/* ── Mobile responsive (≤ 520px) ────────────────────────────────────────── */
+@media (max-width: 520px) {
+    .wordle-grid {
+        grid-template-columns: repeat(5, 50px);
+        grid-template-rows: repeat(6, 50px);
+        gap: 4px;
+    }
+
+    .wordle-cell {
+        width: 50px;
+        height: 50px;
+        font-size: 1.6rem;
+    }
+
+    .wordle-wrapper {
+        gap: 8px;
+    }
+
+    /* Indicator width matches new grid: 5×50 + 4×4 = 266px */
+    .wordle-indicators {
+        width: 266px;
+    }
+}

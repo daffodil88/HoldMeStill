@@ -1,0 +1,9 @@
+# Seconds added to the lock timer when a new game attempt is started.
+ATTEMPT_PENALTY_SECONDS=900
+
+# Seconds subtracted from the lock timer when the game is won.
+WIN_REWARD_SECONDS=1200
+
+# Tile value that triggers a win. Default is 2048. Lower to make the game easier
+# (e.g. WIN_TARGET=1024 makes the game end at 1024 instead of 2048).
+WIN_TARGET=2048

@@ -1,0 +1,31 @@
+subject: Python – Object-Oriented Programming
+description: Answer theory questions and complete a Python coding exercise using object-oriented programming.
+max_time_reduction: 900
+max_time_addition: 900
+
+evaluator_notes: >
+  A theory answer is substantially correct if it shows real understanding, not just a
+  recited definition. The coding exercise is substantially correct if the code is
+  functional and demonstrates genuine understanding of inheritance, not just syntactic
+  correctness. The reflection is substantially correct if it is thoughtful and personal,
+  not generic. Each answer is one vote — one strong or weak answer must not override
+  the overall verdict.
+
+tasks:
+  - title: Theory Questions
+    questions:
+      - What is the difference between a class and an instance?
+      - What does `self` refer to in a method definition?
+      - When would you use inheritance over composition?
+
+  - title: Coding Exercise
+    generate: >
+      Create a small Python coding exercise that requires the student to
+      define at least two classes with inheritance. The scenario should be
+      practical and relatable, not abstract. Present only the task
+      description, not the solution.
+    generate_count: 1
+
+  - title: Reflection
+    questions:
+      - What part of OOP do you find most unintuitive and why?

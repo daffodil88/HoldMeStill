@@ -1,0 +1,341 @@
+/* ── Task picker ─────────────────────────────────────────────────────────── */
+
+.pow-task-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 20px 0;
+    justify-content: center;
+}
+
+.pow-task-card {
+    cursor: default;
+}
+
+
+/* ── Task view ───────────────────────────────────────────────────────────── */
+
+.pow-wrapper {
+    max-width: 680px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.pow-subject {
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.pow-active-times {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #3a3a3c;
+}
+
+.pow-active-times-sep {
+    color: #3a3a3c;
+}
+
+.pow-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.pow-section {
+    background: #1a1a1b;
+    border: 1px solid #3a3a3c;
+    border-radius: 6px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pow-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.pow-questions {
+    margin: 0;
+    padding-left: 20px;
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.pow-questions li + li {
+    margin-top: 4px;
+}
+
+.pow-questions li {
+    white-space: pre-wrap;
+}
+
+.pow-generated {
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.pow-instructions {
+    margin: 0;
+    color: #818384;
+    font-size: 13px;
+    line-height: 1.6;
+    font-style: italic;
+}
+
+/* ── Requirements block ──────────────────────────────────────────────────── */
+
+.pow-requirements {
+    background: #1c1a12;
+    border: 1px solid #4a420a;
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+
+.pow-requirements-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #b59f3b;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.pow-requirements-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #ccc;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* ── Scored-on block ─────────────────────────────────────────────────────── */
+
+.pow-scored-on {
+    background: #111827;
+    border: 1px solid #2a3a4a;
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+
+.pow-scored-on-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b8fae;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.pow-scored-on-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #ccc;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* ── Upload form ─────────────────────────────────────────────────────────── */
+
+.pow-submit-area {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: #1a1a1b;
+    border: 1px solid #3a3a3c;
+    border-radius: 6px;
+    padding: 20px;
+}
+
+.pow-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pow-label {
+    font-size: 13px;
+    color: #818384;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.pow-textarea {
+    background: #121213;
+    border: 1px solid #3a3a3c;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.6;
+}
+.pow-textarea::placeholder { color: #565758; }
+.pow-textarea:focus {
+    outline: none;
+    border-color: #818384;
+}
+
+.pow-file-input {
+    display: none;
+}
+
+.pow-add-files-btn {
+    align-self: flex-start;
+    background: #2a2a2c;
+    color: #ccc;
+    border: 1px solid #3a3a3c;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.pow-add-files-btn:hover  { color: #fff; border-color: #818384; }
+.pow-add-files-btn:active { filter: brightness(0.85); }
+.pow-add-files-btn:disabled { opacity: 0.4; cursor: default; }
+
+.pow-file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 0;
+}
+
+.pow-file-tag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #2a2a2c;
+    border: 1px solid #3a3a3c;
+    border-radius: 4px;
+    padding: 3px 6px 3px 8px;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.pow-file-remove {
+    background: none;
+    border: none;
+    color: #818384;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+}
+.pow-file-remove:hover { color: #e05252; }
+
+.pow-submit-btn {
+    align-self: flex-start;
+}
+
+.pow-msg {
+    font-size: 13px;
+    min-height: 18px;
+}
+.pow-msg.error { color: #e05252; }
+
+/* ── Evaluating overlay ──────────────────────────────────────────────────── */
+
+.pow-evaluating-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(18, 18, 19, 0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #b59f3b;
+    border-radius: 6px;
+    letter-spacing: 0.04em;
+}
+
+/* ── Result view ─────────────────────────────────────────────────────────── */
+
+.pow-result {
+    align-items: center;
+    text-align: center;
+    padding: 12px 0;
+}
+
+.pow-result-heading {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.pow-result-good { color: #538d4e; }
+.pow-result-bad  { color: #b55555; }
+
+.pow-time-delta {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.pow-time-good { color: #538d4e; }
+.pow-time-bad  { color: #b55555; }
+
+.pow-feedback {
+    max-width: 560px;
+    background: #1a1a1b;
+    border: 1px solid #3a3a3c;
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-size: 14px;
+    color: #ccc;
+    line-height: 1.7;
+    text-align: left;
+    white-space: pre-wrap;
+}
+
+/* ── Back button ─────────────────────────────────────────────────────────── */
+
+.pow-back-btn {
+    background: #2a2a2c;
+    color: #818384;
+    border: 1px solid #3a3a3c;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    align-self: flex-start;
+}
+.pow-back-btn:hover { color: #fff; border-color: #818384; }
+.pow-back-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Mobile ──────────────────────────────────────────────────────────────── */
+
+@media (max-width: 520px) {
+    .pow-task-list {
+        padding: 12px 0;
+    }
+
+    .pow-result-heading {
+        font-size: 1.3rem;
+    }
+
+    .pow-back-btn {
+        margin-bottom: 24px;
+    }
+}

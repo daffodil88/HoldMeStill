@@ -1,0 +1,24 @@
+subject: Mathematics – Algebra & Problem Solving
+description: Solve algebra and problem-solving questions covering core mathematical concepts.
+max_time_reduction: 1200
+max_time_addition: 600
+
+evaluator_notes: >
+  A problem is substantially correct if the method is right and working is shown,
+  even with a minor arithmetic slip. No working, a wild guess, or a wrong method
+  counts as incorrect. One perfect answer must not compensate for three blank ones.
+
+tasks:
+  - title: Algebra Problems
+    generate: >
+      Create 5 algebra problems of increasing difficulty, suitable for a
+      student aged 14–16. Include a mix of: solving linear equations,
+      expanding brackets, factorising simple quadratics, and one word problem.
+      Number them 1–5. Present only the problems, no solutions or hints.
+    generate_count: 5
+
+  - title: Your Working
+    player_notes: >
+      Write your full working and final answer for each problem. Show every step —
+      do not skip lines. If you get stuck on a problem, explain where you got stuck
+      and why.

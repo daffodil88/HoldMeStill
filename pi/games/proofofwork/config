@@ -1,0 +1,14 @@
+# Must stay 0 – no upfront penalty
+ATTEMPT_PENALTY_SECONDS=0
+
+# Must stay 0 – adjustments applied later by upload route
+WIN_REWARD_SECONDS=0
+
+# Anthropic API key used to authenticate LLM calls (task generation and submission evaluation)
+ANTHROPIC_API_KEY=
+
+# Claude model used for both task generation (select action) and submission evaluation (upload route)
+LLM_MODEL=claude-haiku-4-5-20251001
+
+# Minimum score (%) for a "good" outcome; ≥N% correct reduces the timer, <N% adds time
+EVALUATION_THRESHOLD=75

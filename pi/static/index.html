@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lock Games</title>
+    <link rel="icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="site-header">
+        <span class="site-title">Lock Games</span>
+        <div id="timer" class="timer-right"></div>
+    </header>
+
+    <div id="lock-panel"></div>
+
+    <div class="games-list" id="games-list">
+        <p style="color:#818384">Loading games…</p>
+    </div>
+
+    <script src="/static/framework.js"></script>
+    <script>
+    // ── Utilities ──────────────────────────────────────────────────────────────
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    async function post(url, body) {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        return resp.json();
+    }
+
+    // ── Lock panel ─────────────────────────────────────────────────────────────
+
+    const lockPanel = document.getElementById('lock-panel');
+    let _lockRetryTimer = null;
+
+    async function loadLockPanel() {
+        await _tryLoadLockPanel();
+    }
+
+    async function _tryLoadLockPanel() {
+        let status;
+        try {
+            const resp = await fetch('/api/status');
+            status = await resp.json();
+        } catch (_) {
+            _showEsp32Error(null);
+            return;
+        }
+
+        if (status.error === 'esp32_unreachable') {
+            _showEsp32Error(status.esp32_url || null);
+            return;
+        }
+
+        // Connection established — cancel any pending retry
+        const wasRetrying = _lockRetryTimer !== null;
+        if (wasRetrying) {
+            clearInterval(_lockRetryTimer);
+            _lockRetryTimer = null;
+        }
+
+        renderLockPanel(status);
+        if (wasRetrying) loadGamesList();
+        if (status.password_valid === false) {
+            showPasswordError();
+        }
+    }
+
+    function _showEsp32Error(esp32Url) {
+        lockPanel.innerHTML = `
+            <div class="lock-row">
+                <span class="lock-status">❌ ESP32 is unreachable</span>
+            </div>`;
+        const location = esp32Url ? ` at ${escapeHtml(esp32Url)}` : '';
+        gamesList.innerHTML = `
+            <div class="password-error-block">
+                <p class="password-error-msg">Cannot reach ESP32${location}.<br>
+                Check BASE_URL is correct in the config file.</p>
+                <p class="lock-error">Retrying\u2026</p>
+            </div>`;
+        if (_lockRetryTimer === null) {
+            _lockRetryTimer = setInterval(_tryLoadLockPanel, 5000);
+        }
+    }
+
+    function showPasswordError() {
+        gamesList.innerHTML = `
+            <div class="password-error-block">
+                <p class="password-error-msg">The game server has a wrong password for the lock.<br>
+                Sadly, this means that you are going to have to sit it out without being able to play.<br>
+                If you have a new password, click below and type it in again.</p>
+                <button class="clear-pw-btn" id="clear-pw-btn">Clear password from memory</button>
+            </div>
+        `;
+        document.getElementById('clear-pw-btn').addEventListener('click', async () => {
+            await post('/api/clear-password', {});
+            loadLockPanel();
+            loadGamesList();
+        });
+    }
+
+    function renderLockPanel(status) {
+        const { locked, pass_locked, password_set } = status;
+
+        if (!locked) {
+            renderLockForm();
+        } else if (pass_locked && !password_set) {
+            renderPasswordEntry();
+        } else if (pass_locked && password_set) {
+            if (status.password_valid === false) {
+                renderWrongPassword(status);
+            } else {
+                renderReady(status);
+            }
+        } else {
+            // locked but not pass-locked — games can't run (no password)
+            lockPanel.innerHTML = `
+                <div class="lock-row">
+                    <span class="lock-status">Locked (no pass-lock active — games unavailable)</span>
+                </div>`;
+        }
+    }
+
+    // ── State: not locked → show lock form ────────────────────────────────────
+
+    function renderLockForm() {
+        lockPanel.innerHTML = `
+            <div class="lock-row">
+                <div class="lock-field">
+                    <label class="lock-label" for="li-initial">Initial duration</label>
+                    <input class="lock-input" id="li-initial" type="text"
+                           placeholder="e.g. 1h, 30m" autocomplete="off">
+                </div>
+                <div class="lock-field">
+                    <label class="lock-label" for="li-max">Max duration</label>
+                    <input class="lock-input" id="li-max" type="text"
+                           placeholder="e.g. 3h" autocomplete="off">
+                </div>
+                <label class="lock-checkbox-row">
+                    <input type="checkbox" id="li-random"> Random
+                </label>
+                <button class="lock-btn" id="li-lock-btn">Lock</button>
+            </div>
+            <div id="li-error" class="lock-error"></div>
+        `;
+        document.getElementById('li-lock-btn').addEventListener('click', doLock);
+        document.getElementById('li-initial').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doLock();
+        });
+        document.getElementById('li-max').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doLock();
+        });
+    }
+
+    async function doLock() {
+        const initialStr = document.getElementById('li-initial').value.trim();
+        const maxStr     = document.getElementById('li-max').value.trim();
+        const useRandom  = document.getElementById('li-random').checked;
+        const errEl      = document.getElementById('li-error');
+        const btn        = document.getElementById('li-lock-btn');
+
+        errEl.textContent = '';
+        if (!initialStr || !maxStr) {
+            errEl.textContent = 'Both duration fields are required.';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Locking…';
+
+        // Parse both duration strings on the server
+        const [r1, r2] = await Promise.all([
+            post('/api/parse-duration', { duration: initialStr }),
+            post('/api/parse-duration', { duration: maxStr }),
+        ]);
+
+        if (r1.error || r2.error) {
+            errEl.textContent = r1.error || r2.error;
+            btn.disabled = false;
+            btn.textContent = 'Lock';
+            return;
+        }
+
+        const lockData = await post('/api/pass-lock', {
+            lock_seconds:     r1.seconds,
+            lock_seconds_max: r2.seconds,
+            random:           useRandom,
+        });
+
+        if (lockData.error) {
+            errEl.textContent = lockData.error;
+            btn.disabled = false;
+            btn.textContent = 'Lock';
+            return;
+        }
+
+        // Password is in RAM, not in lockData — render the ready state directly
+        renderReady(lockData);
+    }
+
+    // ── State: pass-locked, no password in RAM → password entry ───────────────
+
+    function renderPasswordEntry() {
+        lockPanel.innerHTML = `
+            <div class="lock-row">
+                <span class="lock-status">Lock is active — enter password to enable games</span>
+            </div>
+            <div class="lock-row">
+                <input class="lock-input lock-input-wide" id="pw-input" type="password"
+                       placeholder="Password" autocomplete="off">
+                <button class="lock-btn" id="pw-btn">Set Password</button>
+            </div>
+            <div id="pw-error" class="lock-error"></div>
+        `;
+        const input = document.getElementById('pw-input');
+        document.getElementById('pw-btn').addEventListener('click', doSetPassword);
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') doSetPassword();
+        });
+        input.focus();
+    }
+
+    async function doSetPassword() {
+        const input  = document.getElementById('pw-input');
+        const errEl  = document.getElementById('pw-error');
+        const btn    = document.getElementById('pw-btn');
+        const value  = input.value;  // capture before clearing
+
+        // Clear the field immediately — password must not linger in the DOM
+        input.value = '';
+
+        errEl.textContent = '';
+        if (!value.trim()) {
+            errEl.textContent = 'Password cannot be empty.';
+            return;
+        }
+
+        btn.disabled = true;
+        const data = await post('/api/set-password', { password: value });
+
+        if (data.error) {
+            errEl.textContent = data.error;
+            btn.disabled = false;
+            return;
+        }
+
+        // Fetch fresh status so we show correct timer info in the ready state
+        const status = await fetch('/api/status').then(r => r.json());
+        if (status.password_valid === false) {
+            renderWrongPassword(status);
+            showPasswordError();
+            return;
+        }
+        renderReady(status);
+    }
+
+    // ── State: pass-locked, password in RAM → ready to play ───────────────────
+
+    function _lockTimeInfo(status) {
+        const maxOpensAt = status.max_opens_at || '';
+        if (status.random_blind) {
+            return `<span class="lock-label">Opens at ?`
+                 + (maxOpensAt ? ` (latest ${escapeHtml(maxOpensAt)})` : '')
+                 + `</span>`;
+        }
+        const remaining = status.remaining_seconds;
+        const opensAt   = status.opens_at || '';
+        if (remaining !== null && remaining !== undefined) {
+            return `<span class="lock-label">Opens at ${escapeHtml(opensAt)}`
+                 + (maxOpensAt ? ` (latest ${escapeHtml(maxOpensAt)})` : '')
+                 + `</span>`;
+        }
+        return '';
+    }
+
+    function renderReady(status) {
+        const longLock = status.lock_seconds_max != null && status.lock_seconds_max >= 86400;
+        const warningHtml = longLock
+            ? `<div class="lock-long-warning">WARNING: the maximum lock time is MORE THAN 24 HOURS. Make sure this is intentional.</div>`
+            : '';
+        lockPanel.innerHTML = `
+            <div class="lock-row">
+                <span class="lock-status ready">🔒 Locked — ready to play</span>
+                ${_lockTimeInfo(status)}
+            </div>
+            ${warningHtml}
+        `;
+    }
+
+    function renderWrongPassword(status) {
+        lockPanel.innerHTML = `
+            <div class="lock-row">
+                <span class="lock-status">🔒 Locked — wrong password</span>
+                ${_lockTimeInfo(status)}
+            </div>
+        `;
+    }
+
+    // ── Games list ─────────────────────────────────────────────────────────────
+
+    const gamesList = document.getElementById('games-list');
+
+    async function loadGamesList() {
+        try {
+            const games = await fetch('/api/games').then(r => r.json());
+            const broken = games.filter(g => g.error);
+            if (broken.length) {
+                const lines = broken.map(g => escapeHtml(g.error)).join('<br>');
+                gamesList.innerHTML = `
+                    <div class="password-error-block">
+                        <p class="password-error-msg">${lines}</p>
+                        <p class="lock-error">Fix the config file and restart the server.</p>
+                    </div>`;
+                return;
+            }
+            gamesList.innerHTML = '';
+            for (const game of games) {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                const timesHtml = (game.penalty_seconds != null) ? `
+                    <div class="game-card-times">
+                        <span class="time-reward">−${Math.round(game.reward_seconds / 60)}m on win</span>
+                        <span class="time-penalty">+${Math.round(game.penalty_seconds / 60)}m on start  (refunded on win)</span>
+                    </div>` : '';
+                card.innerHTML = `
+                    <div class="game-card-name">${escapeHtml(game.name)}</div>
+                    <div class="game-card-desc">${escapeHtml(game.description)}</div>
+                    ${timesHtml}
+                    <button class="attempt-btn" data-game-id="${escapeHtml(game.id)}">
+                        Attempt a game
+                    </button>
+                `;
+                gamesList.appendChild(card);
+            }
+        } catch (e) {
+            gamesList.innerHTML = '<p style="color:#b55555">Failed to load games.</p>';
+        }
+    }
+
+    gamesList.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.attempt-btn');
+        if (!btn) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Checking…';
+
+        const card = btn.closest('.game-card');
+
+        let status;
+        try {
+            status = await fetch('/api/status').then(r => r.json());
+        } catch (_) {
+            btn.disabled = false;
+            btn.textContent = 'Attempt a game';
+            return;
+        }
+
+        if (!status.pass_locked) {
+            let errEl = card.querySelector('.attempt-error');
+            if (!errEl) {
+                errEl = document.createElement('p');
+                errEl.className = 'attempt-error';
+                card.appendChild(errEl);
+            }
+            errEl.innerHTML = 'You work better under pressure.<br>Start the lock first.';
+            btn.disabled = false;
+            btn.textContent = 'Attempt a game';
+            return;
+        }
+
+        if (status.password_valid === false) {
+            showPasswordError();
+            return;
+        }
+
+        if (!status.password_set) {
+            let errEl = card.querySelector('.attempt-error');
+            if (!errEl) {
+                errEl = document.createElement('p');
+                errEl.className = 'attempt-error';
+                card.appendChild(errEl);
+            }
+            errEl.innerHTML = 'If you were provided with a randomly generated password after locking, you must enter it above to be able to play.';
+            btn.disabled = false;
+            btn.textContent = 'Attempt a game';
+            return;
+        }
+
+        btn.textContent = 'Starting…';
+
+        const gameId = btn.dataset.gameId;
+        try {
+            const data = await post('/api/attempt', { game_id: gameId });
+            if (data.error) {
+                let errEl = card.querySelector('.attempt-error');
+                if (!errEl) {
+                    errEl = document.createElement('p');
+                    errEl.className = 'attempt-error';
+                    card.appendChild(errEl);
+                }
+                errEl.textContent = data.error;
+                btn.disabled = false;
+                btn.textContent = 'Attempt a game';
+                return;
+            }
+            window.location.href = `/game/${gameId}?instance_id=${data.instance_id}`;
+        } catch (_) {
+            btn.disabled = false;
+            btn.textContent = 'Attempt a game';
+        }
+    });
+
+    // ── Boot ───────────────────────────────────────────────────────────────────
+
+    GameFramework.startTimer(document.getElementById('timer'), { minimal: true });
+    loadLockPanel();
+    loadGamesList();
+    </script>
+</body>
+</html>

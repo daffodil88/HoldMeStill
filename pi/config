@@ -1,0 +1,17 @@
+# Base URL for all requests to the ESP32.
+# Use https:// with the IP or hostname (e.g. https://192.168.1.88 or https://esp32.local).
+BASE_URL=
+
+# Path to the ESP32's TLS certificate, used to verify HTTPS connections.
+# Leave empty to use the system CA bundle (won't work with a self-signed cert).
+# Run 'lock_client.py setup-tls' to pin the certificate, then set this.
+CERT_PATH=
+
+# Seconds of clock drift tolerated when verifying that the ESP32 timer was set
+# correctly after a lock command. Increase if the network is slow.
+VERIFY_TOLERANCE_SECS=5
+
+# Earliest point from which random duration selection may pick, expressed as a
+# percentage of the available lock window. 0 = any duration; 50 = back half only,
+# which skews random picks toward longer lock times.
+RANDOM_START_PERCENT=50
