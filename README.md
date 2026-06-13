@@ -69,16 +69,45 @@ By using this project, you accept that:
 
 - You are solely responsible for your own safety and the safety of others.
 - You must always have a reliable emergency secondary release mechanism.
-- You must **only use a power bank** for powering the device. If the ESP32 loses power, the lock releases immediately and stays released — it does not re-engage even if power were somehow restored. This makes the power bank your emergency escape: when it runs out, you're out. Never connect directly to mains power.
+- You must **only use a USB power bank** to power the device, sized to your longest session. The power bank is your secondary emergency release — see the [next section](#the-power-bank-is-your-emergency-release) for full details. Never connect to mains.
 - This software and hardware design is provided as-is, without any warranty. The author accepts no liability for any harm, injury, or damage arising from its use.
 
 **Never use this device in a way that could prevent you from calling for help in an emergency.**
+
+## The Power Bank Is Your Emergency Release
+
+⚠️ **This is the most important paragraph in the entire README. Read it twice.** ⚠️
+
+The device **must be powered from a USB power bank.** Not from mains. Not from a wall charger. Not from a desktop USB port. This is not for convenience — the power bank is the secondary emergency release mechanism for the entire build.
+
+**Why it matters:**
+
+- The ESP32 can crash, freeze, or stop responding for many reasons: a software bug, a corrupted file, a hardware fault. If that happens while you are locked, the only way out is to cut power.
+- When power is lost, the lock releases immediately and stays released. It does not re-engage when power is restored.
+- A power bank runs out on its own — no software, no network, no second person required. **The moment it runs out, you are free.** That is a guaranteed, automatic, hardware-only release, independent of the ESP32, the Pi, and any code running on either of them.
+
+### Pick a low-capacity power bank
+
+A 20000mAh power bank running for nine hours does not give you a safety mechanism. It gives you a long wait.
+
+Match the capacity to the longest session you will ever set. I use an 8000mAh power bank, which I have measured to power the circuit for just under 4 hours, and I never set a session longer than that.
+
+**Sizing formula** — the complete circuit (lock plus ESP32) draws 409mA at 12V. After the buck converter, and accounting for the boost converter inside the power bank, runtime works out to roughly:
+
+```
+Runtime (hours) ≈ power bank capacity (mAh) ÷ 2048
+```
+
+Example: a 10000mAh power bank lasts about 10000 ÷ 2048 ≈ 4.9 hours.
+
+Pick a capacity so the runtime is only a little longer than your longest planned session — long enough that it will not run out before you have finished, short enough that, if everything else has failed, you are not stuck waiting for hours.
 
 ## What You Need
 
 - [MagBound Magnetic Lock](https://ageofbondage.com/products/magbound-premium-magnetic-time-lock-aluminium)
 - [ESP32](https://amzn.eu/d/07gdlals) – I picked the DevKit V1 USB-C. Any standard ESP32 development board (WROOM/WROVER-based) will work — the firmware uses GPIO 5, so just wire to whichever physical pin on your board corresponds to GPIO 5.
 - Raspberry Pi — any model works (the author uses a Pi 4). Or any other spare computer on your network that you can stash out of reach and go dark on over SSH
+- USB power bank — **the safety-critical component**. Size it to your longest session; see [The Power Bank Is Your Emergency Release](#the-power-bank-is-your-emergency-release). I use an 8000mAh model, which lasts just under 4 hours.
 - USB charger DTC-5101 – converts 5V USB to 12V for the magnet – get it [here](https://ageofbondage.com/products/usb-adapter-for-05821) or [here](https://www.akku-wechsel.de/shop/spannungswandler-usb-von-5-volt-auf-auf-12-volt-passend-fur-akku-ladegerat-dtc-5101.html)
 - [Buck converter MP1584EN](https://amzn.eu/d/08iOfTGn)
 - [MOSFET IRLZ44N](https://amzn.eu/d/0aIqyGMR)
