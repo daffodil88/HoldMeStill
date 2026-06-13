@@ -102,6 +102,11 @@ By using this project, you accept that:
 - Nail varnish
 - [Wago connectors (useful if you want to build a prototype)](https://amzn.eu/d/03I0rsXv)
 
+For the Raspberry Pi's SSH toggle (just nice-to-have and optional):
+- LED
+- [6 x 6mm tactile pushbutton](https://amzn.eu/d/0gF7QCIr)
+- Resistor between 100Ω and 150Ω
+
 For the watchdog circuit (optional, currently untested):
 
 - [Adafruit S-35710 Low-Power Wake Up Timer Breakout](https://www.adafruit.com/product/5959)
