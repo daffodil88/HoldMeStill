@@ -5,7 +5,7 @@ import utime
 import network
 import os
 import ssl
-from machine import Pin
+from machine import Pin, I2C
 import config
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
@@ -98,6 +98,96 @@ def gen_password():
 # If the asyncio event loop is briefly blocked (e.g. during a TLS handshake),
 # countdown_loop cannot fire — but ticks_ms() still advances, so the next
 # 200 ms wake-up sees the full elapsed time and catches up correctly.
+
+
+
+
+# ── Optional S-35710 external watchdog ─────────────────────────────────────────
+#
+# If enabled in config.py, the ESP32 periodically re-arms an Adafruit S-35710
+# wake-up timer over I2C. If the firmware freezes and stops re-arming it, the
+# external watchdog circuit releases the lock through the OR gate.
+
+def cfg(name, default):
+    """Read optional config values without breaking older config.py files."""
+    return getattr(config, name, default)
+
+
+WATCHDOG_ENABLED = bool(cfg("WATCHDOG_ENABLED", 0))
+WATCHDOG_SDA_PIN = cfg("WATCHDOG_SDA_PIN", 21)
+WATCHDOG_SCL_PIN = cfg("WATCHDOG_SCL_PIN", 22)
+WATCHDOG_I2C_ADDR = cfg("WATCHDOG_I2C_ADDR", 0x32)
+WATCHDOG_TIMEOUT_SECS = cfg("WATCHDOG_TIMEOUT_SECS", 30)
+WATCHDOG_FEED_SECS = cfg("WATCHDOG_FEED_SECS", 5)
+
+
+class S35710:
+    """Minimal MicroPython driver for the S-35710 wake-up timer."""
+
+    def __init__(self, i2c, address=0x32):
+        self.i2c = i2c
+        self.address = address
+
+    def arm(self, seconds):
+        """Set/re-arm the watchdog alarm in seconds."""
+        seconds = int(seconds)
+        if seconds < 1:
+            seconds = 1
+        if seconds > 0xFFFFFF:
+            seconds = 0xFFFFFF
+
+        self.i2c.writeto(self.address, bytes([
+            0x81,
+            (seconds >> 16) & 0xFF,
+            (seconds >> 8) & 0xFF,
+            seconds & 0xFF,
+        ]))
+
+
+def init_watchdog():
+    """Initialize and arm the optional external watchdog."""
+    if not WATCHDOG_ENABLED:
+        print("Watchdog: disabled")
+        return None
+
+    if WATCHDOG_FEED_SECS >= WATCHDOG_TIMEOUT_SECS:
+        raise RuntimeError("WATCHDOG_FEED_SECS must be less than WATCHDOG_TIMEOUT_SECS")
+
+    i2c = I2C(
+        0,
+        sda=Pin(WATCHDOG_SDA_PIN),
+        scl=Pin(WATCHDOG_SCL_PIN),
+        freq=100000,
+    )
+
+    found = i2c.scan()
+    if WATCHDOG_I2C_ADDR not in found:
+        raise RuntimeError("S-35710 watchdog not found on I2C bus")
+
+    watchdog = S35710(i2c, WATCHDOG_I2C_ADDR)
+    watchdog.arm(WATCHDOG_TIMEOUT_SECS)
+    print("Watchdog: enabled, timeout =", WATCHDOG_TIMEOUT_SECS, "seconds")
+    return watchdog
+
+
+async def watchdog_loop(watchdog):
+    """Periodically re-arm the external watchdog while firmware is healthy."""
+    if watchdog is None:
+        return
+
+    while True:
+        try:
+            await asyncio.sleep(WATCHDOG_FEED_SECS)
+            watchdog.arm(WATCHDOG_TIMEOUT_SECS)
+        except Exception as exc:
+            print("ERROR: watchdog feed failed:", exc)
+            set_pin(False)  # fail open / unlock
+
+            # Stop feeding forever. If the external watchdog circuit is present,
+            # it will time out and keep the lock released.
+            while True:
+                await asyncio.sleep(60)
+
 
 async def countdown_loop():
     last_ms = utime.ticks_ms()
@@ -506,7 +596,15 @@ async def main():
     ip = wlan.ifconfig()[0]
     print("WiFi connected:", ip)
 
+    try:
+        watchdog = init_watchdog()
+    except Exception as exc:
+        print("ERROR: watchdog enabled but failed:", exc)
+        set_pin(False)  # fail open
+        raise SystemExit(1)
+
     asyncio.create_task(countdown_loop())
+    asyncio.create_task(watchdog_loop(watchdog))
 
     # Load TLS credentials if provisioned; fall back to plain HTTP only when
     # neither cert.pem nor key.pem is present (pre-provisioning / dev mode).
