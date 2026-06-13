@@ -108,9 +108,9 @@ For the Raspberry Pi's SSH toggle (just nice-to-have and optional):
 - Resistor between 100Ω and 150Ω
 
 For the watchdog circuit (optional, currently untested):
-
 - [Adafruit S-35710 Low-Power Wake Up Timer Breakout](https://www.adafruit.com/product/5959)
-- OR gate logic IC, e.g. [SN74HCT32N](https://www.digikey.com/en/products/detail/texas-instruments/SN74HCT32N/277261)
+- Additional 2N2222 transistor for the independent watchdog release path
+- Additional 1kΩ resistor for the watchdog transistor base
 
 ## How to Build This
 
@@ -123,21 +123,20 @@ About the plugs: the original magnetic lock uses 5.5 x 2.1 mm DC adapters [like 
 
 ⚠️ The buck converter's output **must** be set to 5V. Adjust the screw on the buck converter while monitoring the output with a multimeter, aiming for between 4.8 V and 5.2 V. Once set, put a drop of nail varnish on the screw to keep it in place.
 
-**If using the optional watchdog circuit:** do **not** wire ESP32 GPIO 5
-directly to the 2N2222/MOSFET driver. Instead, route both the ESP32 release
-signal and the watchdog fault signal through one gate of an SN74HCT32N OR gate.
+**If using the optional watchdog circuit:** leave the existing ESP32 GPIO 5 →
+1kΩ resistor → 2N2222 base connection in place. This remains the normal ESP32
+release path.
 
-Wire the SN74HCT32N as follows:
+The watchdog adds a second, independent 2N2222 release path in parallel with
+the existing one. Either transistor can pull the MOSFET gate low and release
+the lock.
 
-- Pin 14 (`VCC`) → 5V from the buck converter
-- Pin 7 (`GND`) → common GND
-- Pin 1 (`1A`) → ESP32 GPIO 5
-- Pin 2 (`1B`) → S-35710 `OUT`
-- Pin 3 (`1Y`) → 1kΩ resistor → 2N2222 base, replacing the original direct ESP32-to-2N2222 connection
+Wire the watchdog 2N2222 as follows:
 
-
-GPIO 5 should **only** connect to the OR gate input. It should not also be wired
-directly to the 2N2222/MOSFET driver.
+- S-35710 `OUT` → 1kΩ resistor → base of the additional 2N2222
+- Additional 2N2222 emitter → common GND
+- Additional 2N2222 collector → MOSFET gate, the same point controlled by the existing 2N2222
+- Keep the existing MOSFET gate pull-up resistor in place
 
 Wire the S-35710 breakout as follows:
 
@@ -145,17 +144,19 @@ Wire the S-35710 breakout as follows:
 - `GND` → common GND
 - `SDA` → ESP32 GPIO 21
 - `SCL` → ESP32 GPIO 22
-- `OUT` → SN74HCT32N pin 2
+- `OUT` → 1kΩ resistor → base of the additional 2N2222
 
 If using the Adafruit breakout listed above, set the output switch to `INV`.
-The watchdog signal into the OR gate should be LOW while the watchdog is healthy
-and HIGH when the watchdog times out. A HIGH on either OR-gate input releases
-the lock.
+The watchdog output should be LOW while the watchdog is healthy and HIGH when
+the watchdog times out. When `OUT` goes HIGH, the additional 2N2222 pulls the
+MOSFET gate low and releases the lock.
 
 Finally, enable the watchdog in `esp32/config.py`:
 
-set WATCHDOG_ENABLED from 0 to 1
-If this is left at the default value of 0, the firmware will ignore the S-35710 and the watchdog circuit will not be armed.
+`WATCHDOG_ENABLED = 1`
+
+If this is left at the default value of `0`, the firmware will ignore the
+S-35710 and the watchdog circuit will not be armed.
 
 
 ## Repository Structure
@@ -196,23 +197,51 @@ The ESP32 firmware is written in MicroPython. You need to flash MicroPython onto
    ```
 
 2. **Edit `esp32/config.py`**:
+    ```python
+    # ── WiFi ─────────────────────────────────────────────────────────────────────
 
-   ```python
-   # SSID of the WiFi network the ESP32 should connect to.
-   WIFI_SSID = ""
+    # SSID of the WiFi network the ESP32 should connect to.
+    WIFI_SSID = ""
+    # Password for the WiFi network.
+    WIFI_PASSWORD = ""
 
-   # Password for the WiFi network.
-   WIFI_PASSWORD = ""
 
-   # Whether to mirror lock state to the onboard LED (GPIO 2).
-   # 1 = LED on while locked, off while unlocked. 0 = LED unused.
-   LED_ON_LOCK = 1
+    # ── Lock behavior ────────────────────────────────────────────────────────────
 
-   # Seconds after a random lock during which GET /status hides remaining_seconds.
-   # The lock is fully active and the timer can be adjusted
-   # Only the countdown is concealed. 0 = no blind period.
-   RANDOM_BLIND_SECS = 120
-   ```
+    # Whether to mirror lock state to the onboard LED (GPIO 2).
+    # 1 = LED on while locked, off while unlocked. 0 = LED unused.
+    LED_ON_LOCK = 1
+
+    # Seconds after a random lock during which GET /status hides remaining_seconds.
+    # The lock is fully active and the timer can be adjusted.
+    # Only the countdown is concealed. 0 = no blind period.
+    RANDOM_BLIND_SECS = 120
+
+
+    # ── Optional S-35710 external watchdog ────────────────────────────────────────
+
+    # Optional hardware watchdog using an Adafruit S-35710 wake-up timer.
+    # 1 = enabled, 0 = disabled.
+    WATCHDOG_ENABLED = 0
+
+    # ESP32 I2C pins used for the S-35710 breakout.
+    WATCHDOG_SDA_PIN = 21
+    WATCHDOG_SCL_PIN = 22
+
+    # S-35710 I2C address.
+    WATCHDOG_I2C_ADDR = 0x32
+
+    # How long the external watchdog waits before tripping if not re-armed.
+    # Must be longer than WATCHDOG_FEED_SECS.
+    WATCHDOG_TIMEOUT_SECS = 30
+
+    # How often the ESP32 re-arms the watchdog while firmware is healthy.
+    WATCHDOG_FEED_SECS = 5
+```
+
+
+
+   
 
 3. **Upload the firmware files** to the ESP32 using Thonny, `mpremote`, or `ampy`:
 
