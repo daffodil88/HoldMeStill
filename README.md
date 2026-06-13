@@ -60,6 +60,11 @@ The Pi–ESP32 channel is encrypted with HTTPS. The ESP32's TLS private key is g
 
 One more thing worth knowing: if the ESP32 loses power for any reason, the lock releases immediately and stays released. It does not re-engage when power is restored.
 
+As an optional safety measure, a watchdog circuit can be added. If the
+microcontroller fails, freezes, or otherwise stops behaving normally, the
+watchdog will trip and disengage the lock.
+⚠️ This is currently untested. ⚠️
+
 ## ⚠️ This Can Trap You ⚠️
 
 This device is intended to restrict your freedom of movement for a set period of time.<br>
@@ -97,10 +102,10 @@ By using this project, you accept that:
 - Nail varnish
 - [Wago connectors (useful if you want to build a prototype)](https://amzn.eu/d/03I0rsXv)
 
-For the Raspberry Pi's SSH toggle (just nice-to-have and optional):
-- LED
-- [6 x 6mm tactile pushbutton](https://amzn.eu/d/0gF7QCIr)
-- Resistor between 100Ω and 150Ω
+For the watchdog circuit (optional, currently untested):
+
+- [Adafruit S-35710 Low-Power Wake Up Timer Breakout](https://www.adafruit.com/product/5959)
+- OR gate logic IC, e.g. [SN74HCT32N](https://www.digikey.com/en/products/detail/texas-instruments/SN74HCT32N/277261)
 
 ## How to Build This
 
@@ -112,6 +117,35 @@ For the Raspberry Pi's SSH toggle (just nice-to-have and optional):
 About the plugs: the original magnetic lock uses 5.5 x 2.1 mm DC adapters [like this one](https://amzn.eu/d/0aaEWyAC), but I don't like that they can be pulled out under a bit of tension. The aviation plugs fix that problem, but to use them you have to cut the original cable of the MagBound Lock and solder on the aviation connector. It's your call to decide if you are comfortable doing that or whether you want to get the 5.5 × 2.1 mm DC adapters instead.
 
 ⚠️ The buck converter's output **must** be set to 5V. Adjust the screw on the buck converter while monitoring the output with a multimeter, aiming for between 4.8 V and 5.2 V. Once set, put a drop of nail varnish on the screw to keep it in place.
+
+**If using the optional watchdog circuit:** do **not** wire ESP32 GPIO 5
+directly to the 2N2222/MOSFET driver. Instead, route both the ESP32 release
+signal and the watchdog fault signal through one gate of an SN74HCT32N OR gate.
+
+Wire the SN74HCT32N as follows:
+
+- Pin 14 (`VCC`) → 5V from the buck converter
+- Pin 7 (`GND`) → common GND
+- Pin 1 (`1A`) → ESP32 GPIO 5
+- Pin 2 (`1B`) → S-35710 `OUT`
+- Pin 3 (`1Y`) → 1kΩ resistor → 2N2222 base, replacing the original direct ESP32-to-2N2222 connection
+
+
+GPIO 5 should **only** connect to the OR gate input. It should not also be wired
+directly to the 2N2222/MOSFET driver.
+
+Wire the S-35710 breakout as follows:
+
+- `VIN` → ESP32 `3V3`
+- `GND` → common GND
+- `SDA` → ESP32 GPIO 21
+- `SCL` → ESP32 GPIO 22
+- `OUT` → SN74HCT32N pin 2
+
+If using the Adafruit breakout listed above, set the output switch to `INV`.
+The watchdog signal into the OR gate should be LOW while the watchdog is healthy
+and HIGH when the watchdog times out. A HIGH on either OR-gate input releases
+the lock.
 
 ## Repository Structure
 
