@@ -152,6 +152,12 @@ The watchdog signal into the OR gate should be LOW while the watchdog is healthy
 and HIGH when the watchdog times out. A HIGH on either OR-gate input releases
 the lock.
 
+Finally, enable the watchdog in `esp32/config.py`:
+
+set WATCHDOG_ENABLED from 0 to 1
+If this is left at the default value of 0, the firmware will ignore the S-35710 and the watchdog circuit will not be armed.
+
+
 ## Repository Structure
 
 ```
