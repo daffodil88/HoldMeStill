@@ -12,3 +12,7 @@ LED_ON_LOCK = 1
 # The lock is fully active and the timer can be adjusted
 # Only the countdown is concealed. 0 = no blind period.
 RANDOM_BLIND_SECS = 120
+
+# Optional hardware watchdog using an Adafruit S-35710 wake-up timer.
+# 1 = enabled, 0 = disabled.
+WATCHDOG_ENABLED = 0
