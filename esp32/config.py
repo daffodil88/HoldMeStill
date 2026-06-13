@@ -32,5 +32,5 @@ WATCHDOG_I2C_ADDR = 0x32
 # Must be longer than WATCHDOG_FEED_SECS.
 WATCHDOG_TIMEOUT_SECS = 30
 
-# How often the ESP32 re-arms the watchdog while firmware is healthy.
+# How often the ESP32 re-arms the watchdog while ESP32 firmware is healthy.
 WATCHDOG_FEED_SECS = 5
