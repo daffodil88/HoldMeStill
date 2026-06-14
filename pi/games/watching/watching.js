@@ -7,17 +7,41 @@
             apiFetch('state', {}).then(response => {
                 const state = response.state;
                 if (state.status === 'playing' && state.video && state.config) {
-                    this._renderPlaying(container, apiFetch, state.video, state.config, state.start_time || 0);
+                    this._renderPlaying(container, apiFetch, instanceId, state.video, state.config, state.start_time || 0);
+                } else if (state.status === 'preempted') {
+                    this._renderPreempted(container, apiFetch, instanceId);
                 } else if (state.status === 'segment_selecting' && state.video && state.config) {
-                    this._renderSegmentPicker(container, apiFetch, state, state.config,
-                        () => this._renderSelecting(container, apiFetch));
+                    this._renderSegmentPicker(container, apiFetch, instanceId, state, state.config,
+                        () => this._renderSelecting(container, apiFetch, instanceId));
                 } else {
-                    this._renderSelecting(container, apiFetch);
+                    this._renderSelecting(container, apiFetch, instanceId);
                 }
             });
         },
 
-        _renderSelecting(container, apiFetch) {
+        _renderPreempted(container, apiFetch, instanceId) {
+            container.innerHTML = '';
+            const outer = document.createElement('div');
+            outer.className = 'watching-game-layout';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'watching-preempted';
+            const msgP = document.createElement('p');
+            msgP.textContent = 'The video stream was interrupted. Another session may have started, or there was a connection issue.';
+            const backBtn = document.createElement('button');
+            backBtn.className = 'watching-preempted-back';
+            backBtn.textContent = 'Back to selection';
+            backBtn.addEventListener('click', () => {
+                apiFetch('cancel', {}).finally(() => {
+                    this._renderSelecting(container, apiFetch, instanceId);
+                });
+            });
+            msgDiv.appendChild(msgP);
+            msgDiv.appendChild(backBtn);
+            outer.appendChild(msgDiv);
+            container.appendChild(outer);
+        },
+
+        _renderSelecting(container, apiFetch, instanceId) {
             container.innerHTML = '';
 
             const outerDiv = document.createElement('div');
@@ -33,6 +57,11 @@
                 title.className = 'watching-select-title';
                 title.textContent = 'Select a video to watch:';
                 outerDiv.appendChild(title);
+
+                const notice = document.createElement('p');
+                notice.className = 'watching-single-stream-notice';
+                notice.innerHTML = 'Only one video can stream at a time.<br>Starting here stops any other active session.';
+                outerDiv.appendChild(notice);
 
                 if (videos.length === 0) {
                     const msg = document.createElement('p');
@@ -57,11 +86,11 @@
                         apiFetch('select_video', { video: filename }).then(response => {
                             if (response.state.status === 'segment_selecting') {
                                 this._renderSegmentPicker(
-                                    container, apiFetch, response.state, config,
-                                    () => this._renderSelecting(container, apiFetch)
+                                    container, apiFetch, instanceId, response.state, config,
+                                    () => this._renderSelecting(container, apiFetch, instanceId)
                                 );
                             } else {
-                                this._renderPlaying(container, apiFetch, filename, config, 0);
+                                this._renderPlaying(container, apiFetch, instanceId, filename, config, 0);
                             }
                         });
                     });
@@ -73,7 +102,7 @@
             });
         },
 
-        _renderSegmentPicker(container, apiFetch, state, config, onBack) {
+        _renderSegmentPicker(container, apiFetch, instanceId, state, config, onBack) {
             const videoName = state.video;
             const videoDuration = state.video_duration;
             const segmentDuration = config.segment_duration;
@@ -187,12 +216,12 @@
                 backBtn.disabled = true;
                 watchBtn.textContent = 'Loading…';
                 apiFetch('select_video', { video: videoName, start_time: startTime }).then(() => {
-                    this._renderPlaying(container, apiFetch, videoName, config, startTime);
+                    this._renderPlaying(container, apiFetch, instanceId, videoName, config, startTime);
                 });
             });
         },
 
-        _renderPlaying(container, apiFetch, videoName, config, startTime) {
+        _renderPlaying(container, apiFetch, instanceId, videoName, config, startTime) {
             const minInterval = (config.min_interval || 10) * 1000;
             const maxInterval = (config.max_interval || 20) * 1000;
             const dotTimeout  = (config.dot_timeout  || 3)  * 1000;
@@ -212,8 +241,8 @@
             const params = new URLSearchParams();
             if (startTime > 0) params.set('start', startTime);
             if (segDuration > 0) params.set('duration', segDuration);
-            const qs = params.toString();
-            video.src = '/games/watching/videos/' + encodeURIComponent(videoName) + (qs ? '?' + qs : '');
+            params.set('iid', instanceId);
+            video.src = '/games/watching/videos/' + encodeURIComponent(videoName) + '?' + params.toString();
             video.disablePictureInPicture = true;
             // No controls — seek bar is intentionally hidden
             wrapper.appendChild(video);
@@ -394,6 +423,34 @@
             // ── Context menu suppression ─────────────────────────────────────
             video.addEventListener('contextmenu', e => e.preventDefault());
 
+            // ── Stream interruption (preemption by another session) ──────────
+            // Two complementary signals: server-pushed state (polled) and the
+            // <video> element's 'error' event. Polling is the reliable path;
+            // the error event is a backup that may fire faster in some cases.
+            let statePollHandle = null;
+            const showPreempted = () => {
+                if (gameOver) return;
+                gameOver = true;
+                document.removeEventListener('keydown', handleKeydown);
+                clearTimeout(nextDotTimer);
+                clearTimeout(activeDotTimeoutHandle);
+                if (statePollHandle !== null) clearInterval(statePollHandle);
+                if (activeDotEl) { activeDotEl.remove(); activeDotEl = null; }
+                window.removeEventListener('beforeunload', stopBeacon);
+                this._renderPreempted(container, apiFetch, instanceId);
+            };
+
+            video.addEventListener('error', showPreempted);
+
+            statePollHandle = setInterval(() => {
+                if (gameOver) { clearInterval(statePollHandle); return; }
+                apiFetch('state', {}).then(response => {
+                    if (response && response.state && response.state.status === 'preempted') {
+                        showPreempted();
+                    }
+                }).catch(() => {});
+            }, 2000);
+
             // ── Fullscreen: native fullscreen on the video element is cheating;
             //   our button requests fullscreen on the wrapper (overlay stays visible)
             document.addEventListener('fullscreenchange', () => {
@@ -457,27 +514,39 @@
             // ── Video end ────────────────────────────────────────────────────
             video.addEventListener('ended', () => {
                 if (gameOver) return;
-                gameOver = true;
-                document.removeEventListener('keydown', handleKeydown);
-                clearTimeout(nextDotTimer);
-                clearTimeout(activeDotTimeoutHandle);
-                if (activeDotEl) { activeDotEl.remove(); activeDotEl = null; }
-                playPauseBtn.disabled = true;
-                window.removeEventListener('beforeunload', stopBeacon);
-
-                apiFetch('report', { hits, misses }).then(response => {
-                    const scrollToEndButtons = () => {
-                        document.getElementById('game-end-buttons')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    };
-                    if (response.result === 'win') {
-                        statusEl.textContent = `You won! ${hits} hit, ${misses} missed.`;
-                        statusEl.classList.add('win');
-                        apiFetch('win', {}).then(scrollToEndButtons);
-                    } else {
-                        statusEl.textContent = `You lost. ${hits} hit, ${misses} missed.`;
-                        statusEl.classList.add('lose');
-                        apiFetch('lose', {}).then(scrollToEndButtons);
+                // The browser sometimes surfaces a killed stream as 'ended' rather
+                // than 'error' (buffer plays out, then chunked transfer EOF). Check
+                // server state first so we render the preempted message instead of
+                // calling report (which would mark this as a loss).
+                apiFetch('state', {}).then(response => {
+                    if (gameOver) return;
+                    if (response && response.state && response.state.status === 'preempted') {
+                        showPreempted();
+                        return;
                     }
+                    gameOver = true;
+                    document.removeEventListener('keydown', handleKeydown);
+                    clearTimeout(nextDotTimer);
+                    clearTimeout(activeDotTimeoutHandle);
+                    if (statePollHandle !== null) clearInterval(statePollHandle);
+                    if (activeDotEl) { activeDotEl.remove(); activeDotEl = null; }
+                    playPauseBtn.disabled = true;
+                    window.removeEventListener('beforeunload', stopBeacon);
+
+                    apiFetch('report', { hits, misses }).then(reportResponse => {
+                        const scrollToEndButtons = () => {
+                            document.getElementById('game-end-buttons')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        };
+                        if (reportResponse.result === 'win') {
+                            statusEl.textContent = `You won! ${hits} hit, ${misses} missed.`;
+                            statusEl.classList.add('win');
+                            apiFetch('win', {}).then(scrollToEndButtons);
+                        } else {
+                            statusEl.textContent = `You lost. ${hits} hit, ${misses} missed.`;
+                            statusEl.classList.add('lose');
+                            apiFetch('lose', {}).then(scrollToEndButtons);
+                        }
+                    });
                 });
             });
 

@@ -15,6 +15,7 @@ import sys
 import anthropic
 import yaml
 from flask import jsonify, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 
 def _save_to_history(history: dict, task_id: str, text_answers: str, file_hashes: set) -> None:
@@ -70,6 +71,7 @@ class ProofOfWorkGame:
 
         self._model = config.get("LLM_MODEL", "claude-haiku-4-5-20251001").strip()
         self._evaluation_threshold = int(config.get("EVALUATION_THRESHOLD", "75"))
+        self._max_upload_bytes = int(config.get("MAX_UPLOAD_MB", "30")) * 1024 * 1024
         self._client = anthropic.Anthropic(api_key=api_key)
         self._submission_history: dict = {}  # task_id → {"texts": [...], "file_hashes": set()}
 
@@ -185,6 +187,7 @@ class ProofOfWorkGame:
             "adjustment_seconds": None,
             "feedback": None,
             "quality": None,
+            "max_upload_bytes": self._max_upload_bytes,
         }
 
     def get_state(self, state: dict) -> dict:
@@ -201,6 +204,12 @@ class ProofOfWorkGame:
 
     def register_routes(self, app, instances: dict, get_password):
         """Register the multipart upload/evaluate route."""
+
+        # Cap request bodies so a huge upload can't exhaust the Pi's RAM
+        # (evaluation reads the whole file into memory to send to the LLM).
+        # Take the max if another plugin has already set a larger limit.
+        current = app.config.get("MAX_CONTENT_LENGTH") or 0
+        app.config["MAX_CONTENT_LENGTH"] = max(current, self._max_upload_bytes)
 
         @app.route(f"/api/game/{self.id}/<instance_id>/upload", methods=["POST"])
         def proofofwork_upload(instance_id):
@@ -221,6 +230,11 @@ class ProofOfWorkGame:
 
             try:
                 result = self._evaluate_submission(instance["state"], request)
+            except RequestEntityTooLarge:
+                # Roll back so the player can retry with a smaller file;
+                # the app-level errorhandler turns this into a 413 response.
+                instance["state"] = {**instance["state"], "status": "active"}
+                raise
             except anthropic.AuthenticationError as e:
                 instance["state"] = {**instance["state"], "status": "active"}
                 print(f"proofofwork: evaluation error: {e}", file=sys.stderr)
@@ -242,7 +256,11 @@ class ProofOfWorkGame:
             password = get_password()
             if password:
                 from lock_client import api_pass_adjust
-                api_pass_adjust(password, adjustment)
+                try:
+                    api_pass_adjust(password, adjustment)
+                except SystemExit:
+                    instance["state"] = {**instance["state"], "status": "active"}
+                    return jsonify({"error": "esp32_unreachable"}), 503
 
             # Update instance state
             new_status = "won" if quality == "good" else "lost"

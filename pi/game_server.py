@@ -4,8 +4,10 @@ import importlib.util
 import inspect
 import os as _os
 import random as _random
+import sys as _sys
 import uuid
 from flask import Flask, abort, jsonify, request, send_from_directory
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import lock_client
 from lock_client import (
@@ -16,6 +18,16 @@ from lock_client import (
 )
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def _handle_request_too_large(_e):
+    limit = app.config.get("MAX_CONTENT_LENGTH")
+    detail = (
+        f"Upload exceeds the {limit // (1024 * 1024)} MB limit."
+        if limit else "Upload too large."
+    )
+    return jsonify({"error": "upload too large", "detail": detail}), 413
 
 # ── Password — RAM only, never sent to browser, never written to disk ──────────
 _password = None
@@ -119,15 +131,21 @@ def api_status_route():
 @app.route("/api/pass-lock", methods=["POST"])
 def api_pass_lock_route():
     global _password
-    data = request.json
-    lock_seconds = int(data["lock_seconds"])
-    lock_seconds_max = int(data["lock_seconds_max"])
+    data = request.json or {}
+    try:
+        lock_seconds = int(data["lock_seconds"])
+        lock_seconds_max = int(data["lock_seconds_max"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "lock_seconds and lock_seconds_max required"}), 400
     use_random = bool(data.get("random", False))
 
     if use_random:
         lock_seconds = _random_initial_secs(lock_seconds, lock_seconds_max)
 
-    result = api_pass_lock(lock_seconds, lock_seconds_max, random_lock=use_random)
+    try:
+        result = api_pass_lock(lock_seconds, lock_seconds_max, random_lock=use_random)
+    except SystemExit:
+        return jsonify({"error": "esp32_unreachable"}), 503
     _password = result["password"]  # stored in RAM only — never sent to browser
 
     lock_max = result["lock_seconds_max"]
@@ -185,8 +203,9 @@ def api_parse_duration():
 
 @app.route("/api/attempt", methods=["POST"])
 def api_attempt():
-    data = request.json
-    game_id = data["game_id"]
+    game_id = (request.json or {}).get("game_id")
+    if not game_id:
+        return jsonify({"error": "game_id required"}), 400
     plugin = _plugins.get(game_id)
     if not plugin:
         return jsonify({"error": "unknown game"}), 404
@@ -196,11 +215,13 @@ def api_attempt():
     # Capture remaining_seconds before the penalty so we can compute what was
     # actually added — the ESP32 clamps to lock_seconds_max, so the effective
     # penalty may be smaller than ATTEMPT_PENALTY_SECONDS.
-    pre_status = _api_status(_password)
+    try:
+        pre_status = _api_status(_password)
+        # Apply attempt penalty at instance-creation time (not at loss time)
+        result = api_pass_adjust(_password, plugin.ATTEMPT_PENALTY_SECONDS)
+    except SystemExit:
+        return jsonify({"error": "esp32_unreachable"}), 503
     pre_remaining = pre_status["remaining_seconds"]
-
-    # Apply attempt penalty at instance-creation time (not at loss time)
-    result = api_pass_adjust(_password, plugin.ATTEMPT_PENALTY_SECONDS)
 
     # Actual seconds added (≤ ATTEMPT_PENALTY_SECONDS when clamped).
     # During the blind period both pre_remaining and result["remaining_seconds"]
@@ -229,8 +250,9 @@ def api_attempt():
 
 @app.route("/api/win", methods=["POST"])
 def api_win():
-    data = request.json
-    instance_id = data["instance_id"]
+    instance_id = (request.json or {}).get("instance_id")
+    if not instance_id:
+        return jsonify({"error": "instance_id required"}), 400
     instance = _instances.get(instance_id)
     if not instance:
         return jsonify({"error": "instance not found"}), 404
@@ -264,8 +286,9 @@ def api_win():
 
 @app.route("/api/lose", methods=["POST"])
 def api_lose():
-    data = request.json
-    instance_id = data["instance_id"]
+    instance_id = (request.json or {}).get("instance_id")
+    if not instance_id:
+        return jsonify({"error": "instance_id required"}), 400
     instance = _instances.get(instance_id)
     if not instance:
         return jsonify({"error": "instance not found"}), 404
@@ -274,7 +297,10 @@ def api_lose():
 
     # No timer adjustment on loss — penalty was applied at instance creation
     instance["resolved"] = True
-    status = _api_status(_password)
+    try:
+        status = _api_status(_password)
+    except SystemExit:
+        return jsonify({"error": "esp32_unreachable"}), 503
     return jsonify({"remaining_seconds": status["remaining_seconds"]})
 
 
@@ -332,11 +358,19 @@ def _autodiscover_plugins() -> None:
             continue
         spec = importlib.util.spec_from_file_location(f"games.{name}", py_file)
         module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        for _, cls in inspect.getmembers(module, inspect.isclass):
-            if hasattr(cls, "id") and hasattr(cls, "new_instance"):
-                discovered.append(cls())
-                break
+        try:
+            spec.loader.exec_module(module)
+            for _, cls in inspect.getmembers(module, inspect.isclass):
+                if (
+                    cls.__module__ == module.__name__
+                    and hasattr(cls, "id")
+                    and hasattr(cls, "new_instance")
+                ):
+                    discovered.append(cls())
+                    break
+        except Exception as e:
+            print(f"WARNING: failed to load plugin {name}: {e}", file=_sys.stderr)
+            continue
 
     # Parse games.conf: ordering + disabled set
     disabled = set()

@@ -120,6 +120,7 @@ Pick a capacity so the runtime is only a little longer than your longest planned
 - [Case](https://amzn.eu/d/0eeQJ0Qy) (or even better a 3D printer if you have one)
   - [Step drill bit for drilling the two holes in the case](https://amzn.eu/d/08Gg2OW4)
 - Perfboard
+- 2x [2-Pin PCB screw terminals](https://www.amazon.de/dp/B087RLZ22G)
 - Cables of various colours (or white cables and coloured Sharpie markers)
 - Multimeter
 - Soldering iron
@@ -128,7 +129,7 @@ Pick a capacity so the runtime is only a little longer than your longest planned
 
 For the Raspberry Pi's SSH toggle (just nice-to-have and optional):
 - LED
-- [6 x 6mm tactile pushbutton](https://amzn.eu/d/0gF7QCIr)
+- [6×6mm tactile pushbutton](https://amzn.eu/d/0gF7QCIr)
 - Resistor between 100Ω and 150Ω
 
 ## How to Build This
@@ -138,7 +139,7 @@ For the Raspberry Pi's SSH toggle (just nice-to-have and optional):
 
 **Why a 2N2222 is needed:** the IRLZ44N is sold as a logic-level MOSFET, but at the ESP32's 3.3V GPIO it doesn't quite fully turn on. The resulting on-resistance is high enough that the lock current heats the MOSFET noticeably. The 2N2222 inverts the GPIO signal and drives the gate the full 0V to 5V instead, which collapses the on-resistance to its rated value and keeps the MOSFET cool. The inversion is intentional and the firmware is written to match: GPIO 5 HIGH pulls the gate low, MOSFET off, lock unlocked.
 
-About the plugs: the original magnetic lock uses 5.5 x 2.1 mm DC adapters [like this one](https://amzn.eu/d/0aaEWyAC), but I don't like that they can be pulled out under a bit of tension. The aviation plugs fix that problem, but to use them you have to cut the original cable of the MagBound Lock and solder on the aviation connector. It's your call to decide if you are comfortable doing that or whether you want to get the 5.5 × 2.1 mm DC adapters instead.
+About the plugs: the original magnetic lock uses 5.5 × 2.1 mm DC adapters [like this one](https://amzn.eu/d/0aaEWyAC), but I don't like that they can be pulled out under a bit of tension. The aviation plugs fix that problem, but to use them you have to cut the original cable of the MagBound Lock and solder on the aviation connector. It's your call to decide if you are comfortable doing that or whether you want to get the 5.5 × 2.1 mm DC adapters instead.
 
 ⚠️ The buck converter's output **must** be set to 5V. Adjust the screw on the buck converter while monitoring the output with a multimeter, aiming for between 4.8 V and 5.2 V. Once set, put a drop of nail varnish on the screw to keep it in place.
 
@@ -306,7 +307,17 @@ The ESP32 firmware is written in MicroPython. You need to flash MicroPython onto
 
    The server runs on port 5000 and is accessible on your local network.
    Once it's running, disable SSH — that's what keeps you honest.
-   You can use [this script](pi/ssh_toggle.py) which utilises a button: short press to toggle the SSH state, long press to power off the Pi. Wire a button to GPIO 17 (BCM, to GND) and an LED to GPIO 27 (BCM, active-high) — the LED mirrors the SSH state. Install the `gpiozero` dependency via apt so it is available to the system Python:
+
+   #### Optional: SSH toggle button
+
+   You can use [this script](pi/ssh_toggle.py) which utilises a button: short press to toggle the SSH state, long press to power off the Pi. The LED mirrors the SSH state, so you can see at a glance whether SSH is on.
+
+   The hardware is simple enough to solder onto a small piece of perfboard: a tactile push button, an LED, and a current-limiting resistor between 100Ω and 150Ω in series with the LED. Wire it up like this:
+
+   - **Button:** one leg to GPIO 17 (physical pin 11 on the header), the other leg to GND. No resistor needed — the script enables the Pi's internal pull-up.
+   - **LED:** anode (long leg) to GPIO 27 (physical pin 13) through the 100–150Ω resistor, cathode (short leg) to GND. The pin is driven active-high.
+
+   Install the `gpiozero` dependency via apt so it is available to the system Python:
 
    ```bash
    sudo apt install python3-gpiozero

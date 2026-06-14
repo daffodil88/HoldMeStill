@@ -274,6 +274,23 @@
                     msgEl.textContent = '';
                     msgEl.className = 'game-message pow-msg';
 
+                    const maxBytes = state.max_upload_bytes;
+                    let totalBytes = 0;
+                    for (const f of selectedFiles.values()) {
+                        totalBytes += f.size;
+                    }
+                    if (maxBytes && totalBytes > maxBytes) {
+                        const limitMb = Math.floor(maxBytes / (1024 * 1024));
+                        const actualMb = (totalBytes / (1024 * 1024)).toFixed(1);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Submit for evaluation';
+                        msgEl.textContent =
+                            `Upload too large: ${actualMb} MB exceeds the ${limitMb} MB limit. ` +
+                            `Remove or shrink a file and try again.`;
+                        msgEl.className = 'game-message pow-msg error';
+                        return;
+                    }
+
                     const formData = new FormData();
                     formData.append('text_answers', container.querySelector('#pow-text').value);
                     for (const f of selectedFiles.values()) {

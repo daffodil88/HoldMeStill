@@ -12,3 +12,6 @@ LLM_MODEL=claude-haiku-4-5-20251001
 
 # Minimum score (%) for a "good" outcome; ≥N% correct reduces the timer, <N% adds time
 EVALUATION_THRESHOLD=75
+
+# Maximum size of a single submission (text + all files), in megabytes
+MAX_UPLOAD_MB=30

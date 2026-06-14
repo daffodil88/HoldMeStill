@@ -32,7 +32,27 @@ def _load_config(path: str) -> dict:
             config[key.strip()] = value.strip()
     return config
 
-_cfg = _load_config(os.path.join(os.path.dirname(os.path.realpath(__file__)), "config"))
+_DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config")
+
+
+def _resolve_config_path() -> str:
+    """Return the config path to load: $LOCK_CLIENT_CONFIG or the default."""
+    return os.environ.get("LOCK_CLIENT_CONFIG") or _DEFAULT_CONFIG_PATH
+
+
+_CONFIG_PATH = _resolve_config_path()
+try:
+    _cfg = _load_config(_CONFIG_PATH)
+except FileNotFoundError:
+    if os.environ.get("LOCK_CLIENT_CONFIG"):
+        print(
+            f"Error: config file not found: {_CONFIG_PATH}\n"
+            "  (set via $LOCK_CLIENT_CONFIG)",
+            file=sys.stderr,
+        )
+    else:
+        print(f"Error: config file not found: {_CONFIG_PATH}", file=sys.stderr)
+    sys.exit(1)
 BASE_URL              = _cfg.get("BASE_URL", "")
 CERT_PATH             = _cfg.get("CERT_PATH", "").strip()   # path to ESP32 TLS cert; empty = system CA
 VERIFY_TOLERANCE_SECS = int(_cfg.get("VERIFY_TOLERANCE_SECS", "5"))
@@ -152,9 +172,8 @@ def _ssl_cert_error(exc: Exception) -> None:
 def _check_cert_path() -> None:
     """Exit with a clear message if CERT_PATH/BASE_URL are misconfigured."""
     if not BASE_URL:
-        cfg_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config")
         print(
-            f"Error: BASE_URL is not set in {cfg_path}\n"
+            f"Error: BASE_URL is not set in {_CONFIG_PATH}\n"
             "Set it to the ESP32's address, e.g.: BASE_URL=https://192.168.1.88",
             file=sys.stderr,
         )
@@ -811,8 +830,7 @@ def cmd_setup_tls() -> None:
 
     print(f"Certificate pinned to {cert_path}.")
     if not CERT_PATH:
-        cfg_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config")
-        print(f"\nAdd this line to {cfg_path}:")
+        print(f"\nAdd this line to {_CONFIG_PATH}:")
         print(f"  CERT_PATH={cert_path}")
 
 
@@ -820,6 +838,45 @@ def cmd_setup_tls() -> None:
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+
+    # Extract -c / --config <path> from anywhere in the arg list, then reload
+    # config-derived module globals from the supplied path. Precedence:
+    # CLI flag > $LOCK_CLIENT_CONFIG (already honoured at import time) > default.
+    _flag_config_path: str | None = None
+    _filtered: list[str] = []
+    _i = 0
+    while _i < len(args):
+        _a = args[_i]
+        if _a in ("-c", "--config"):
+            if _i + 1 >= len(args) or args[_i + 1].startswith("-"):
+                print(f"Error: {_a} requires a path argument.", file=sys.stderr)
+                sys.exit(1)
+            _flag_config_path = args[_i + 1]
+            _i += 2
+            continue
+        if _a.startswith("--config="):
+            _flag_config_path = _a[len("--config="):]
+            if not _flag_config_path:
+                print("Error: --config= requires a path argument.", file=sys.stderr)
+                sys.exit(1)
+            _i += 1
+            continue
+        _filtered.append(_a)
+        _i += 1
+    args = _filtered
+
+    if _flag_config_path is not None:
+        try:
+            _cfg = _load_config(_flag_config_path)
+        except FileNotFoundError:
+            print(f"Error: config file not found: {_flag_config_path}", file=sys.stderr)
+            sys.exit(1)
+        _CONFIG_PATH = _flag_config_path
+        BASE_URL              = _cfg.get("BASE_URL", "")
+        CERT_PATH             = _cfg.get("CERT_PATH", "").strip()
+        VERIFY_TOLERANCE_SECS = int(_cfg.get("VERIFY_TOLERANCE_SECS", "5"))
+        RANDOM_START_PERCENT  = int(_cfg.get("RANDOM_START_PERCENT", "50"))
+
     cmd = args[0] if args else ""
 
     match cmd:
@@ -853,7 +910,11 @@ if __name__ == "__main__":
                 args[2] if len(args) > 2 else "",
             )
         case _:
-            print(f"Usage: {sys.argv[0]} <subcommand> [args]", file=sys.stderr)
+            print(f"Usage: {sys.argv[0]} [-c <path>] <subcommand> [args]", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("Global options:", file=sys.stderr)
+            print("  -c, --config <path>                           path to the config file", file=sys.stderr)
+            print("                                                (overrides $LOCK_CLIENT_CONFIG and the default)", file=sys.stderr)
             print("", file=sys.stderr)
             print("Subcommands:", file=sys.stderr)
             print("  setup-tls                                     pin the ESP32 TLS certificate", file=sys.stderr)
@@ -871,10 +932,11 @@ if __name__ == "__main__":
             print("  absolute local time (next occurrence)         20:30", file=sys.stderr)
             print("  pass-adjust prefix: +1h / -30m / +20:30", file=sys.stderr)
             print("", file=sys.stderr)
-            cfg_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config")
-            print(f"Config (edit {cfg_path}):", file=sys.stderr)
+            print(f"Config (edit {_CONFIG_PATH}):", file=sys.stderr)
             print(f"  BASE_URL              {BASE_URL}  — full base URL", file=sys.stderr)
             print(f"  CERT_PATH             {CERT_PATH or '(not set)'}  — path to pinned ESP32 TLS certificate", file=sys.stderr)
             print(f"  VERIFY_TOLERANCE_SECS {VERIFY_TOLERANCE_SECS}  — allowed drift when verifying timer after lock", file=sys.stderr)
             print(f"  RANDOM_START_PERCENT  {RANDOM_START_PERCENT}  — earliest point random mode can pick, % of window", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("Config path resolution order: -c/--config, then $LOCK_CLIENT_CONFIG, then the default.", file=sys.stderr)
             sys.exit(1)

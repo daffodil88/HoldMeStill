@@ -2,7 +2,6 @@
 
 import os
 import random
-import sys
 
 
 def _load_config(path: str) -> dict:
@@ -55,12 +54,12 @@ class WordleGame:
             with open(word_list_path) as f:
                 words = [line.strip().upper() for line in f if line.strip()]
         except FileNotFoundError:
-            print(f"Error: wordle-list not found at {word_list_path}", file=sys.stderr)
-            sys.exit(1)
+            self._config_error = f"games/{self.id}/wordle-list not found"
+            return
 
         if not words:
-            print("Error: wordle-list is empty", file=sys.stderr)
-            sys.exit(1)
+            self._config_error = f"games/{self.id}/wordle-list is empty"
+            return
 
         self._words = words
 
@@ -70,8 +69,8 @@ class WordleGame:
                 with open(allowed_path) as f:
                     allowed = {line.strip().upper() for line in f if line.strip()}
             except FileNotFoundError:
-                print(f"Error: allowed-guesses not found at {allowed_path}", file=sys.stderr)
-                sys.exit(1)
+                self._config_error = f"games/{self.id}/allowed-guesses not found"
+                return
             # Answers are always valid guesses even if missing from allowed-guesses
             self._allowed = allowed | set(self._words)
 

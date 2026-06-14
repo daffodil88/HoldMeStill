@@ -29,6 +29,16 @@ It covers every CLI command and every importable Python function, with examples.
 | `VERIFY_TOLERANCE_SECS` | Allowed clock-drift (seconds) when verifying timer after `lock` or `pass-lock` |
 | `RANDOM_START_PERCENT` | Earliest point (% of window) the `random` mode can pick |
 
+**Config file location.** The default path is `pi/config` (next to the script).
+Override with either:
+
+- CLI flag `-c <path>` / `--config <path>` / `--config=<path>` — applies to a single invocation.
+- Environment variable `LOCK_CLIENT_CONFIG=<path>` — applies to every invocation in the
+  environment, including processes that import `lock_client` as a module (e.g. `game_server.py`).
+
+Precedence is CLI flag > env var > default. If `-c` points at a missing file the
+client exits with `Error: config file not found: <path>`.
+
 ### TLS Setup
 
 The ESP32 serves HTTPS once provisioned with a self-signed certificate. The

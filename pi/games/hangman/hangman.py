@@ -2,7 +2,6 @@
 
 import os
 import random
-import sys
 
 
 def _load_config(path: str) -> dict:
@@ -54,12 +53,12 @@ class HangmanGame:
             with open(word_list_path) as f:
                 words = [line.strip().upper() for line in f if line.strip()]
         except FileNotFoundError:
-            print(f"Error: hangman-list not found at {word_list_path}", file=sys.stderr)
-            sys.exit(1)
+            self._config_error = f"games/{self.id}/hangman-list not found"
+            return
 
         if not words:
-            print("Error: hangman-list is empty", file=sys.stderr)
-            sys.exit(1)
+            self._config_error = f"games/{self.id}/hangman-list is empty"
+            return
 
         self._words = words
 

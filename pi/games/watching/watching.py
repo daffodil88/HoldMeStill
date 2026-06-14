@@ -45,6 +45,7 @@ class WatchingGame:
     VIDEOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "videos")
 
     _current_proc = None          # Popen | None — at most one stream at a time
+    _current_owner = None         # instance_id | None — owner of _current_proc
     _proc_lock = threading.Lock()
 
     def __init__(self):
@@ -91,11 +92,24 @@ class WatchingGame:
 
     # ── Custom routes ──────────────────────────────────────────────────────────
 
-    def register_routes(self, app, *_) -> None:
+    def register_routes(self, app, instances=None, *_) -> None:
         """Register streaming video, thumbnail, and stop routes."""
         from flask import Response, abort, request, stream_with_context
 
         videos_dir = self.videos_dir
+
+        def _mark_preempted(old_owner, new_owner):
+            """Mark the displaced session's instance as preempted, if applicable.
+
+            Only marks when the displaced owner is a different instance still in
+            'playing' status — reloads (same instance_id) and already-finished
+            sessions are left alone.
+            """
+            if not old_owner or old_owner == new_owner or instances is None:
+                return
+            inst = instances.get(old_owner)
+            if inst and inst["state"].get("status") == "playing":
+                inst["state"]["status"] = "preempted"
 
         def _safe_video_path(filename):
             """Return (abs_path, safe_name) if valid, else abort 404."""
@@ -120,14 +134,7 @@ class WatchingGame:
                 seg_duration = max(0.0, float(request.args.get("duration", "0")))
             except ValueError:
                 seg_duration = 0.0
-
-            # Kill any existing stream before starting a new one (only one at a time)
-            with WatchingGame._proc_lock:
-                old = WatchingGame._current_proc
-                WatchingGame._current_proc = None
-            if old and old.poll() is None:
-                old.kill()
-                old.wait()
+            instance_id = request.args.get("iid", "")
 
             # Probe codecs
             try:
@@ -166,13 +173,27 @@ class WatchingGame:
                 "-f", "mp4", "-movflags", "frag_keyframe+empty_moov",
                 "pipe:1",
             ]
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                    bufsize=0)
-            fd = proc.stdout.fileno()
+            # Serialize takeover under the lock: kill+reap the old ffmpeg BEFORE
+            # spawning the new one. This guarantees at most one streaming ffmpeg
+            # exists at any moment — important on the Pi, where two concurrent
+            # transcodes would saturate CPU. The lock also serializes concurrent
+            # requests, so two parallel callers can't both pass a None check and
+            # orphan a process.
             with WatchingGame._proc_lock:
+                old = WatchingGame._current_proc
+                old_owner = WatchingGame._current_owner
+                if old and old.poll() is None:
+                    old.kill()
+                    old.wait()
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL, bufsize=0)
                 WatchingGame._current_proc = proc
+                WatchingGame._current_owner = instance_id or None
+            fd = proc.stdout.fileno()
+            _mark_preempted(old_owner, instance_id)
 
             def generate():
+                cleared_self = False
                 try:
                     while True:
                         try:
@@ -197,6 +218,15 @@ class WatchingGame:
                     with WatchingGame._proc_lock:
                         if WatchingGame._current_proc is proc:
                             WatchingGame._current_proc = None
+                            WatchingGame._current_owner = None
+                            cleared_self = True
+
+                # If another stream displaced us, abort the HTTP response without
+                # the chunked-transfer terminator. This makes the browser fire
+                # 'error' immediately instead of playing from its buffer until it
+                # drains (which could be 30+ seconds of buffered video).
+                if not cleared_self:
+                    raise ConnectionAbortedError("stream preempted")
 
             return Response(
                 stream_with_context(generate()),
@@ -229,6 +259,7 @@ class WatchingGame:
             with WatchingGame._proc_lock:
                 proc = WatchingGame._current_proc
                 WatchingGame._current_proc = None
+                WatchingGame._current_owner = None
             if proc and proc.poll() is None:
                 proc.kill()
                 # generate()'s finally will call proc.wait(); don't block here
@@ -249,6 +280,8 @@ class WatchingGame:
             return self._handle_select_video(state, payload)
         if action == "report":
             return self._handle_report(state, payload)
+        if action == "cancel":
+            return self._handle_cancel(state)
         return {"state": state, "result": "continue"}
 
     # ── Internals ──────────────────────────────────────────────────────────────
@@ -342,6 +375,11 @@ class WatchingGame:
         new_state = {**state, "status": "playing", "video": safe_name, "start_time": 0.0,
                      "playing_since": time.time(), "playing_secs": playing_secs}
         return {"state": new_state, "result": "continue"}
+
+    def _handle_cancel(self, state: dict) -> dict:
+        if state.get("status") not in ("playing", "preempted"):
+            return {"state": state, "result": "continue"}
+        return {"state": {**state, "status": "selecting"}, "result": "continue"}
 
     def _handle_report(self, state: dict, payload: dict) -> dict:
         if state.get("status") != "playing":
